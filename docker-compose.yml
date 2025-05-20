@@ -1,0 +1,59 @@
+services:
+  app:
+    container_name: reports_api
+    platform: linux/amd64
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - static:/static
+      - media:/media
+    ports:
+    - 8000:8000
+  jenkins-docker:
+    image: docker:dind
+    container_name: jenkins-docker
+    privileged: true
+    environment:
+      - DOCKER_TLS_CERTDIR=/certs
+    volumes:
+      - jenkins-docker-certs:/certs/client
+      - jenkins-data:/var/jenkins_home
+    ports:
+      - "2376:2376"
+    networks:
+      jenkins:
+        aliases:
+          - docker
+    command: --storage-driver overlay2
+
+  my-jenkins:
+    image: my-jenkins
+    container_name: my-jenkins
+    restart: on-failure
+    environment:
+      - DOCKER_HOST=tcp://docker:2376
+      - DOCKER_CERT_PATH=/certs/client
+      - DOCKER_TLS_VERIFY=1
+    volumes:
+      - jenkins-data:/var/jenkins_home
+      - jenkins-docker-certs:/certs/client:ro
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    networks:
+      - jenkins
+volumes:
+  static: 
+  media:
+  jenkins-docker-certs:
+  jenkins-data:
+
+networks:
+  jenkins:
+    driver: bridge
